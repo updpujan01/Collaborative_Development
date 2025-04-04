@@ -16,10 +16,23 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from "firebase/auth";
 import { auth, db } from "../../firebase/config";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+
+const collegeDomainMap: Record<string, string> = {
+  "Herald College Kathmandu": "@heraldcollege.edu.np",
+  "Islington College": "@islingtoncollege.edu.np",
+  "Biratnagar International College": "@bicnepal.edu.np",
+  "Informatics College Pokhara": "@icp.edu.np",
+  "Fishtail Mountain College": "@fishtailmountain.edu.np",
+  "Itahari International College": "@icc.edu.np",
+  "Apex College": "@apexcollege.edu.np",
+  "International School of Tourism and Hotel Management (IST)": "@istcollege.edu.np",
+  "CG Institute of Management": "@cgim.edu.np",
+};
 
 const VoterLogin: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -35,9 +48,18 @@ const VoterLogin: React.FC = () => {
 
   useEffect(() => {
     // Check if user is already logged in
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        navigate("/voter");
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (user.emailVerified && userDoc.exists() && userDoc.data().role === "voter") {
+            navigate("/voter");
+          } else {
+            await auth.signOut(); // Sign out unverified users or users with incorrect roles
+          }
+        } catch (err) {
+          console.error("Error checking user role:", err);
+        }
       }
     });
 
@@ -53,6 +75,14 @@ const VoterLogin: React.FC = () => {
       return;
     }
 
+    if (!isLogin) {
+      const expectedDomain = collegeDomainMap[college];
+      if (!email.endsWith(expectedDomain)) {
+        setError(`Email domain must match the selected college (${expectedDomain}).`);
+        return;
+      }
+    }
+
     if (!isLogin && password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -62,15 +92,31 @@ const VoterLogin: React.FC = () => {
     try {
       if (isLogin) {
         // Login user
-        await signInWithEmailAndPassword(auth, email, password);
-        navigate("/voter");
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+        // Check if email is verified
+        if (userCredential.user.emailVerified) {
+          const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+          if (userDoc.exists() && userDoc.data().role === "voter") {
+            navigate("/voter");
+          } else {
+            setError("Invalid credentials for voter login");
+            await auth.signOut(); // Sign out the user if the role doesn't match
+          }
+        } else {
+          setError("Email not verified. Please verify your email before logging in.");
+          await auth.signOut(); // Sign out if email is not verified
+        }
       } else {
         // Register new user
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+        // Send email verification
+        await sendEmailVerification(userCredential.user);
+
+        // Show popup and toggle to login form
+        alert("A verification email has been sent to your email address. Please verify your email before logging in.");
+        setIsLogin(true); // Toggle to login form
 
         // Create user profile in Firestore
         await setDoc(doc(db, "users", userCredential.user.uid), {
@@ -80,8 +126,6 @@ const VoterLogin: React.FC = () => {
           role: "voter",
           createdAt: serverTimestamp(),
         });
-
-        navigate("/voter");
       }
     } catch (err: any) {
       console.error("Authentication error:", err);
@@ -181,36 +225,44 @@ const VoterLogin: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12}>
-                <TextField
-                  label="Choose Your College"
-                  select
-                  fullWidth
-                  required
-                  value={college}
-                  onChange={(e) => setCollege(e.target.value)}
-                >
-                  <MenuItem value="Herald College Kathmandu">
-                    Herald College Kathmandu
-                  </MenuItem>
-                  <MenuItem value="Islington College">
-                    Islington College
-                  </MenuItem>
-                  <MenuItem value="Biratnagar College">
-                    Biratnagar College
-                  </MenuItem>
-                  <MenuItem value="Informatics College">
-                    Informatics College
-                  </MenuItem>
-                  <MenuItem value="Fishtail Mountain College">
-                    Fishtail Mountain College
-                  </MenuItem>
-                  <MenuItem value="Itahari International College">
-                    Itahari International College
-                  </MenuItem>
-                  <MenuItem value="Apex College">Apex College</MenuItem>
-                </TextField>
-              </Grid>
+              {!isLogin && (
+                <Grid item xs={12}>
+                  <TextField
+                    label="Choose Your College"
+                    select
+                    fullWidth
+                    value={college}
+                    onChange={(e) => setCollege(e.target.value)}
+                    required
+                  >
+                    <MenuItem value="Herald College Kathmandu">
+                      Herald College Kathmandu
+                    </MenuItem>
+                    <MenuItem value="Islington College">
+                      Islington College
+                    </MenuItem>
+                    <MenuItem value="Biratnagar International College">
+                      Biratnagar International College
+                    </MenuItem>
+                    <MenuItem value="Informatics College Pokhara">
+                      Informatics College Pokhara
+                    </MenuItem>
+                    <MenuItem value="Fishtail Mountain College">
+                      Fishtail Mountain College
+                    </MenuItem>
+                    <MenuItem value="Itahari International College">
+                      Itahari International College
+                    </MenuItem>
+                    <MenuItem value="Apex College">Apex College</MenuItem>
+                    <MenuItem value="International School of Tourism and Hotel Management (IST)">
+                      International School of Tourism and Hotel Management (IST)
+                    </MenuItem>
+                    <MenuItem value="CG Institute of Management">
+                      CG Institute of Management
+                    </MenuItem>
+                  </TextField>
+                </Grid>
+              )}
 
               <Grid item xs={12}>
                 <TextField

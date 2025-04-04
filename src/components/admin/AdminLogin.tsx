@@ -10,7 +10,6 @@ import {
   CardContent,
   Alert,
   Link,
-  MenuItem,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -19,7 +18,6 @@ import { auth } from "../../firebase/config";
 const AdminLogin: React.FC = () => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [college, setCollege] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const navigate = useNavigate();
@@ -28,8 +26,8 @@ const AdminLogin: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    if (!email || !password || !college) {
-      setError("Please fill in all fields, including selecting your college.");
+    if (!email || !password) {
+      setError("Please fill in all fields.");
       return;
     }
 
@@ -74,36 +72,7 @@ const AdminLogin: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    label="Choose Your College"
-                    select
-                    fullWidth
-                    required
-                    value={college}
-                    onChange={(e) => setCollege(e.target.value)}
-                  >
-                    <MenuItem value="Herald College Kathmandu">
-                      Herald College Kathmandu
-                    </MenuItem>
-                    <MenuItem value="Islington College">
-                      Islington College
-                    </MenuItem>
-                    <MenuItem value="Biratnagar College">
-                      Biratnagar College
-                    </MenuItem>
-                    <MenuItem value="Informatics College">
-                      Informatics College
-                    </MenuItem>
-                    <MenuItem value="Fishtail Mountain College">
-                      Fishtail Mountain College
-                    </MenuItem>
-                    <MenuItem value="Itahari International College">
-                      Itahari International College
-                    </MenuItem>
-                    <MenuItem value="Apex College">Apex College</MenuItem>
-                  </TextField>
-                </Grid>
+
                 <Grid item xs={12}>
                   <TextField
                     label="Password"
@@ -114,6 +83,7 @@ const AdminLogin: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </Grid>
+
                 <Grid item xs={12}>
                   <Button
                     type="submit"

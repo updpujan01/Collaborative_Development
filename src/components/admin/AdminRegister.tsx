@@ -13,7 +13,7 @@ import {
   MenuItem,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from "firebase/auth";
 import { auth, db } from "../../firebase/config";
 import { doc, setDoc } from "firebase/firestore";
 
@@ -26,6 +26,18 @@ const AdminRegister: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const navigate = useNavigate();
+
+  const collegeDomainMap: Record<string, string> = {
+    "Herald College Kathmandu": "@heraldcollege.edu.np",
+    "Islington College": "@islingtoncollege.edu.np",
+    "Biratnagar International College": "@bicnepal.edu.np",
+    "Informatics College Pokhara": "@icp.edu.np",
+    "Fishtail Mountain College": "@fishtailmountain.edu.np",
+    "Itahari International College": "@icc.edu.np",
+    "Apex College": "@apexcollege.edu.np",
+    "International School of Tourism and Hotel Management (IST)": "@istcollege.edu.np",
+    "CG Institute of Management": "@cgim.edu.np",
+  };
 
   const validateForm = (): boolean => {
     if (!name.trim()) {
@@ -40,6 +52,12 @@ const AdminRegister: React.FC = () => {
 
     if (!college.trim()) {
       setError("Please select your college");
+      return false;
+    }
+
+    const expectedDomain = collegeDomainMap[college];
+    if (!email.endsWith(expectedDomain)) {
+      setError(`Email domain must match the selected college (${expectedDomain}).`);
       return false;
     }
 
@@ -71,16 +89,19 @@ const AdminRegister: React.FC = () => {
         email,
         password
       );
-      const user = userCredential.user;
+
+      // Send email verification
+      await sendEmailVerification(userCredential.user);
+      alert("A verification email has been sent to your email address. Please verify your email before logging in.");
 
       // Update user profile with name
-      await updateProfile(user, {
+      await updateProfile(userCredential.user, {
         displayName: name,
       });
 
       // Store additional user data in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        uid: userCredential.user.uid,
         name,
         email,
         college,
@@ -88,7 +109,9 @@ const AdminRegister: React.FC = () => {
         createdAt: new Date().toISOString(),
       });
 
-      navigate("/admin/dashboard");
+      // Redirect to login page after sending the verification email
+      navigate("/admin/login");
+      setError("Registration successful! Please verify your email before logging in.");
     } catch (err: any) {
       console.error("Registration error:", err);
       setError(err.message || "Failed to register. Please try again.");
@@ -138,7 +161,7 @@ const AdminRegister: React.FC = () => {
                     label="Choose Your College"
                     select
                     fullWidth
-                    required
+                    required // This makes the field compulsory
                     value={college}
                     onChange={(e) => setCollege(e.target.value)}
                   >
@@ -148,11 +171,11 @@ const AdminRegister: React.FC = () => {
                     <MenuItem value="Islington College">
                       Islington College
                     </MenuItem>
-                    <MenuItem value="Biratnagar College">
-                      Biratnagar College
+                    <MenuItem value="Biratnagar International College">
+                      Biratnagar International College
                     </MenuItem>
-                    <MenuItem value="Informatics College">
-                      Informatics College
+                    <MenuItem value="Informatics College Pokhara">
+                      Informatics College Pokhara
                     </MenuItem>
                     <MenuItem value="Fishtail Mountain College">
                       Fishtail Mountain College
@@ -161,6 +184,12 @@ const AdminRegister: React.FC = () => {
                       Itahari International College
                     </MenuItem>
                     <MenuItem value="Apex College">Apex College</MenuItem>
+                    <MenuItem value="International School of Tourism and Hotel Management (IST)">
+                      International School of Tourism and Hotel Management (IST)
+                    </MenuItem>
+                    <MenuItem value="CG Institute of Management">
+                      CG Institute of Management
+                    </MenuItem>
                   </TextField>
                 </Grid>
                 <Grid item xs={12}>
