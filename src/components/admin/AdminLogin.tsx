@@ -33,13 +33,18 @@ const AdminLogin: React.FC = () => {
 
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/admin/dashboard");
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+      // Check if email is verified
+      if (userCredential.user.emailVerified) {
+        navigate("/admin/dashboard");
+      } else {
+        setError("Email not verified. Please verify your email before logging in.");
+        await auth.signOut(); // Sign out if email is not verified
+      }
     } catch (err: any) {
       console.error("Login error:", err);
-      setError(
-        err.message || "Failed to login. Please check your credentials."
-      );
+      setError(err.message || "Failed to login. Please check your credentials.");
     } finally {
       setLoading(false);
     }
